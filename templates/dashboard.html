@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Behavioral Authentication</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+        #status {
+            font-size: 18px;
+            margin-top: 20px;
+        }
+        #otpBox {
+            display: none;
+            margin-top: 20px;
+        }
+        input {
+            padding: 6px;
+            font-size: 16px;
+        }
+        button {
+            padding: 6px 12px;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Continuous Behavioral Authentication</h2>
+    <button onclick="logout()" style="float:right;">Logout</button>
+
+    <p>Move your mouse naturally. System is monitoring in real time.</p>
+
+    <div id="status">Status: Monitoring...</div>
+
+    <div id="otpBox">
+        <p>Suspicious activity detected. Enter OTP:</p>
+        <input type="text" id="otpInput" />
+        <button onclick="submitOTP()">Verify OTP</button>
+    </div>
+
+    <script src="/static/mouse.js"></script>
+</body>
+</html>

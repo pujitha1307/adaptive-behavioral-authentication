@@ -1,0 +1,16 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+
+# Runtime data
+dataset/
+
+# Trained models
+model/*.pkl
+
+# Mac system files
+.DS_Store
+
