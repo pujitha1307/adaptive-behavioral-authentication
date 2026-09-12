@@ -22,11 +22,11 @@ Instead of relying solely on static credentials, this system applies **unsupervi
 
 - 🔐 **Debounced & Adaptive Multi-Tiered Step-Up Security**
   - **Low Risk (<60% / Confidence >40%)**: Background monitoring with zero user disruption.
-  - **Medium Risk (60% – 90% / Confidence 10%–40%)**: **Debounced OTP Verification** (requires 3 consecutive medium-risk evaluation windows before locking to prevent false positives).
+  - **Medium Risk (60% – 90% / Confidence 10%–40%)**: **Debounced OTP Verification** (requires 3 consecutive medium-risk evaluation windows before locking to prevent false positives; 5-attempt max lockout).
   - **High Risk (≥90% / Confidence <10%)**: **Immediate Sticky Screen Lock** requiring **Specified Reason Dropdown** selection + **Password Re-authentication** (`user_01` / `password123`).
 
 - 🧪 **Automated Testing & CI/CD Pipeline**
-  - Integrated `pytest` suite testing feature extraction, false-positive debounce counters, OTP lifecycle, and input validation.
+  - Integrated `pytest` suite testing feature extraction, false-positive debounce counters, OTP lifecycle, max-attempt lockout, and input validation.
   - GitHub Actions CI workflow running automated builds on every push.
 
 - 🎨 **Modern Glassmorphism & Telemetry Visualizer UI**
@@ -35,12 +35,18 @@ Instead of relying solely on static credentials, this system applies **unsupervi
 
 ---
 
+## 📊 Data-Derived Risk Thresholds & Model Evaluation
+
+Risk score boundaries and sigmoidal mapping parameters are data-derived directly from the training set score distribution in `train_model.py`. After fitting the `IsolationForest` model on baseline telemetry, `model.decision_function()` is evaluated across the training samples to compute baseline score percentiles, which are saved to `model/thresholds.json`. In `train_model.py`, 20% of the baseline telemetry sequence is held out as an unseen validation set to compute the **False Positive Rate (FPR)**, saved alongside training sample sizes to `model/metrics.json` and logged during build pipelines. `authenticate.py` dynamically loads these data-derived parameters in memory rather than relying on arbitrary hardcoded guesses.
+
+---
+
 ## 🔐 Risk Thresholds & Action Matrix
 
 | Risk Score | Confidence Score | System Status | Security Action & Debounce Requirement |
 |---|---|---|---|
 | **`< 60%`** | **`> 40%`** | `AUTHENTICATED` | **Normal Session**: Uninterrupted background monitoring. Resets debounce counter to 0. |
-| **`60% – 90%`** | **`10% – 40%`** | `OTP_REQUIRED` | **Debounced Step-Up OTP**: Requires **3 consecutive medium-risk windows** to trigger sticky 6-digit OTP prompt. |
+| **`60% – 90%`** | **`10% – 40%`** | `OTP_REQUIRED` | **Debounced Step-Up OTP**: Requires **3 consecutive medium-risk windows** to trigger sticky 6-digit OTP prompt. 5 max failed attempts lockout. |
 | **`≥ 90%`** | **`< 10%`** | `HIGH_RISK_WARNING` | **Immediate Lockout**: Bypasses debounce. Must select specified reason from dropdown & re-enter credentials (`user_01` / `password123`). |
 
 ---
@@ -76,13 +82,14 @@ adaptive-behavioral-authentication/
 │
 ├── model/
 │   ├── user_01.pkl         # Trained IsolationForest anomaly detection model
-│   └── scaler.pkl          # Trained StandardScaler normalization model
+│   ├── scaler.pkl          # Trained StandardScaler normalization model
+│   ├── thresholds.json     # Data-derived score thresholds & parameters
+│   └── metrics.json        # Validation metrics (sample counts, false positive rate)
 │
 ├── dataset/
 │   └── user_01/
 │       ├── baseline.csv    # Initial baseline training trajectory
 │       ├── session_live.csv# Real-time session coordinate logs
-│       ├── latest_otp.txt  # Secure OTP log
 │       └── security_reasons.txt # Audit logs of submitted reasons & re-authentications
 │
 ├── static/

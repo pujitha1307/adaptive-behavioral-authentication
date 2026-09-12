@@ -1,12 +1,12 @@
 import csv
 import logging
 import os
-import random
+import secrets
 import time
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from authenticate import compute_risk
+from authenticate import compute_risk, get_thresholds
 
 # Load environment variables
 load_dotenv()
@@ -16,17 +16,26 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "adaptive-auth-fallback-secret-key-3.9")
+
+# Task 7: Remove hardcoded fallback secrets from source
+secret_key_env = os.getenv("FLASK_SECRET_KEY")
+if not secret_key_env:
+    secret_key_env = secrets.token_hex(32)
+    logger.info("FLASK_SECRET_KEY not set in environment. Generated ephemeral secret key for local development.")
+
+app.secret_key = secret_key_env
 
 USER = "user_01"
-# Secure password hashing with pbkdf2:sha256 for universal Python compatibility
-USER_PASSWORD_HASH = generate_password_hash(
-    os.getenv("USER_01_PASSWORD", "password123"),
-    method="pbkdf2:sha256"
-)
-SESSION_FILE = "session_live"
+user_pass_env = os.getenv("USER_01_PASSWORD")
+if not user_pass_env:
+    user_pass_env = "password123"
+    logger.info("USER_01_PASSWORD not set in environment. Defaulting to development password ('password123').")
 
+USER_PASSWORD_HASH = generate_password_hash(user_pass_env, method="pbkdf2:sha256")
+
+SESSION_FILE = "session_live"
 OTP_EXPIRY_SECONDS = 300  # 5 minutes expiry
+MAX_OTP_ATTEMPTS = 5
 
 @app.route("/")
 def login():
@@ -40,6 +49,7 @@ def start_session():
     session["otp_code"] = None
     session["otp_verified"] = False
     session["otp_timestamp"] = 0.0
+    session["otp_attempts"] = 0
     logger.info("New behavioral authentication session started for user %s", USER)
     return render_template("dashboard.html")
 
@@ -72,6 +82,11 @@ def collect():
     risk = eval_result["risk"]
     confidence = eval_result["confidence"]
 
+    # Task 5: Load data-derived risk thresholds
+    thresholds = get_thresholds()
+    medium_risk_thresh = thresholds.get("medium_risk_threshold", 60.0)
+    high_risk_thresh = thresholds.get("high_risk_threshold", 90.0)
+
     current_state = session.get("session_state", "NORMAL")
     otp_verified = session.get("otp_verified", False)
 
@@ -92,19 +107,20 @@ def collect():
             "status": "OTP_REQUIRED"
         })
 
-    # Stage 1: Debounce Logic & Threshold Evaluation
-    # 🔴 Critical High Risk (>= 90%): Skip debounce and lock immediately!
-    if risk >= 90.0:
+    # Debounce Logic & Threshold Evaluation
+    # 🔴 Critical High Risk (>= high_risk_thresh): Skip debounce and lock immediately!
+    if risk >= high_risk_thresh:
         session["session_state"] = "LOCKED_WARNING"
         session["suspicious_count"] = 0
         status = "HIGH_RISK_WARNING"
-        logger.info("High risk threshold crossed (%s%%). Transitioning immediately to HIGH_RISK_WARNING.", risk)
+        logger.info("High risk threshold crossed (%s%% >= %s%%). Transitioning to HIGH_RISK_WARNING.", risk, high_risk_thresh)
 
-    # 🟡 Medium Risk (60% - 90%): Debounce required (3 consecutive windows)
-    elif risk >= 60.0 and not otp_verified:
+    # 🟡 Medium Risk (>= medium_risk_thresh): Debounce required (3 consecutive windows)
+    elif risk >= medium_risk_thresh and not otp_verified:
         susp_count = session.get("suspicious_count", 0) + 1
         session["suspicious_count"] = susp_count
-        logger.info("Medium risk window detected (%s%%). Consecutive suspicious count: %d/3", risk, susp_count)
+        logger.info("Medium risk window detected (%s%% >= %s%%). Consecutive suspicious count: %d/3",
+                    risk, medium_risk_thresh, susp_count)
 
         if susp_count >= 3:
             session["session_state"] = "LOCKED_OTP"
@@ -116,19 +132,19 @@ def collect():
             otp_ts = session.get("otp_timestamp", 0.0)
 
             if not existing_otp or (now - otp_ts) > OTP_EXPIRY_SECONDS:
-                new_otp = str(random.randint(100000, 999999))
+                # Task 1: Cryptographically secure OTP generation using secrets module
+                new_otp = str(secrets.randbelow(900000) + 100000)
                 session["otp_code"] = new_otp
                 session["otp_timestamp"] = now
                 session["otp_verified"] = False
-                logger.info("Generated new security OTP for session (Expiry: %ds)", OTP_EXPIRY_SECONDS)
+                session["otp_attempts"] = 0
 
-                # Write OTP to secure file log for local testing
-                with open(f"dataset/{USER}/latest_otp.txt", "w") as f:
-                    f.write(new_otp)
+                # Task 2: Log only that an OTP was generated; NEVER write or log raw OTP value to disk
+                logger.info("Generated new cryptographically secure OTP for session (Expiry: %ds)", OTP_EXPIRY_SECONDS)
         else:
             status = "AUTHENTICATED"
 
-    # 🟢 Normal Low Risk (< 60%): Reset debounce count
+    # 🟢 Normal Low Risk (< medium_risk_thresh): Reset debounce count
     else:
         session["suspicious_count"] = 0
         status = "AUTHENTICATED"
@@ -147,24 +163,48 @@ def verify_otp():
 
     stored_otp = session.get("otp_code")
     otp_ts = session.get("otp_timestamp", 0.0)
+    attempts = session.get("otp_attempts", 0)
     now = time.time()
+
+    if not stored_otp:
+        logger.warning("OTP verification attempt with no active OTP")
+        return jsonify({"result": "OTP_INVALID"}), 400
 
     # Check OTP expiry
     if (now - otp_ts) > OTP_EXPIRY_SECONDS:
         logger.info("OTP verification failed: OTP expired")
         session["otp_code"] = None
+        session["otp_attempts"] = 0
         return jsonify({"result": "OTP_EXPIRED"}), 400
 
-    if stored_otp and entered_otp == stored_otp and not session.get("otp_verified", False):
+    # Check correct OTP match
+    if entered_otp == stored_otp and not session.get("otp_verified", False):
         session["otp_verified"] = True
         session["session_state"] = "NORMAL"
         session["suspicious_count"] = 0
         session["otp_code"] = None  # Prevent OTP reuse
+        session["otp_attempts"] = 0
         logger.info("OTP verified successfully. Session unlocked.")
         return jsonify({"result": "OTP_VERIFIED"})
 
-    logger.warning("OTP verification failed: invalid or reused OTP entered")
-    return jsonify({"result": "OTP_INVALID"}), 400
+    # Task 3: Failed OTP verification -> Increment attempts counter (Max 5 attempts lockout)
+    attempts += 1
+    session["otp_attempts"] = attempts
+    logger.warning("OTP verification failed (Attempt %d/%d)", attempts, MAX_OTP_ATTEMPTS)
+
+    if attempts >= MAX_OTP_ATTEMPTS:
+        session["otp_code"] = None
+        session["otp_attempts"] = 0
+        logger.warning("Maximum OTP verification attempts (%d) reached. Current OTP invalidated.", MAX_OTP_ATTEMPTS)
+        return jsonify({
+            "result": "OTP_LOCKED",
+            "error": "Maximum OTP verification attempts exceeded. Current OTP invalidated."
+        }), 400
+
+    return jsonify({
+        "result": "OTP_INVALID",
+        "attempts_remaining": MAX_OTP_ATTEMPTS - attempts
+    }), 400
 
 @app.route("/verify-credentials", methods=["POST"])
 def verify_credentials():

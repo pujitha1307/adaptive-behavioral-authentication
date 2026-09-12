@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from app import app
 from extract_features import extract_raw, extract
-from authenticate import compute_risk
+from authenticate import compute_risk, get_thresholds
 
 @pytest.fixture
 def client():
@@ -120,6 +120,38 @@ def test_otp_verification_flow(client, monkeypatch):
     resp_reuse = client.post("/verify-otp", json={"otp": otp_code})
     assert resp_reuse.status_code == 400
     assert resp_reuse.get_json()["result"] == "OTP_INVALID"
+
+def test_otp_max_attempts_lockout(client, monkeypatch):
+    """Task 3: Test 5-attempt max lockout invalidating OTP."""
+    client.post("/start-session")
+
+    # Trigger OTP state
+    monkeypatch.setattr("app.compute_risk", lambda path: {"risk": 70.0, "confidence": 30.0})
+    for i in range(3):
+        client.post("/collect", json=[{"t": (i+1)*1000, "x": 10, "y": 20}])
+
+    # Submit 4 wrong attempts
+    for attempt in range(1, 5):
+        resp = client.post("/verify-otp", json={"otp": "000000"})
+        assert resp.status_code == 400
+        assert resp.get_json()["result"] == "OTP_INVALID"
+        assert resp.get_json()["attempts_remaining"] == 5 - attempt
+
+    # Submit 5th wrong attempt -> Should return OTP_LOCKED and invalidate code
+    resp_5 = client.post("/verify-otp", json={"otp": "000000"})
+    assert resp_5.status_code == 400
+    assert resp_5.get_json()["result"] == "OTP_LOCKED"
+
+    with client.session_transaction() as sess:
+        assert sess.get("otp_code") is None
+
+def test_data_derived_thresholds_loader():
+    """Task 5: Test loading data-derived risk thresholds from model/thresholds.json."""
+    thresholds = get_thresholds()
+    assert "medium_risk_threshold" in thresholds
+    assert "high_risk_threshold" in thresholds
+    assert isinstance(thresholds["medium_risk_threshold"], (int, float))
+    assert isinstance(thresholds["high_risk_threshold"], (int, float))
 
 def test_credentials_reauth_flow(client, monkeypatch):
     """Stage 4 & 6: Test re-authentication with password check and specified reason."""

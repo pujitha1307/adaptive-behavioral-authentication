@@ -1,0 +1,7 @@
+{
+  "train_sample_count": 320,
+  "val_sample_count": 80,
+  "false_positive_rate": 0.125,
+  "medium_risk_threshold": 60.0,
+  "high_risk_threshold": 90.0
+}
