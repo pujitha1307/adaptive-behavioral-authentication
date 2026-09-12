@@ -1,9 +1,11 @@
 import os
+import logging
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import joblib
 
+logger = logging.getLogger(__name__)
 SCALER_PATH = "model/scaler.pkl"
 
 def extract_raw(df):
@@ -52,7 +54,7 @@ def extract(file_path, scaler=None, fit=False):
             scaled = loaded_scaler.transform(features)
             return pd.DataFrame(scaled, columns=features.columns)
         except Exception as e:
-            print("Warning: could not load scaler:", e)
+            logger.warning("Could not load pre-fitted scaler from %s: %s", SCALER_PATH, e)
 
     # Fallback if no pre-fitted scaler is present
     fallback_scaler = StandardScaler()

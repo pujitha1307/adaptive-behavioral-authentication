@@ -2,8 +2,14 @@
 __pycache__/
 *.pyc
 
+# Environment & config secrets
+.env
+
 # Virtual environment
 venv/
+
+# Testing cache
+.pytest_cache/
 
 # Runtime data
 dataset/
@@ -13,4 +19,3 @@ model/*.pkl
 
 # Mac system files
 .DS_Store
-

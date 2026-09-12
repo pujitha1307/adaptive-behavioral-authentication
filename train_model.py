@@ -1,10 +1,14 @@
 import os
+import logging
 import pandas as pd
 import numpy as np
 from extract_features import extract_raw
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
 import joblib
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 USER_DIR = "dataset/user_01"
 MODEL_DIR = "model"
@@ -17,7 +21,7 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 # Generate or reload baseline data
 baseline_path = os.path.join(USER_DIR, "baseline.csv")
 
-print("Generating representative baseline training dataset for user_01...")
+logger.info("Generating representative baseline training dataset for user_01...")
 t = 1000
 x, y = 300, 300
 rows = []
@@ -51,5 +55,5 @@ model.fit(X_train)
 joblib.dump(model, MODEL_PATH)
 joblib.dump(scaler, SCALER_PATH)
 
-print("✅ Model trained successfully and saved to:", MODEL_PATH)
-print("✅ Scaler fitted and saved to:", SCALER_PATH)
+logger.info("Model trained successfully and saved to: %s", MODEL_PATH)
+logger.info("Scaler fitted and saved to: %s", SCALER_PATH)
