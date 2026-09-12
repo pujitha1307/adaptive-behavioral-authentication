@@ -1,44 +1,448 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Behavioral Authentication</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Continuous Behavioral Authentication Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
+
+        body {
+            min-height: 100vh;
+            background: #090d16;
+            color: #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            position: relative;
+        }
+
+        /* Topbar Navigation */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 16px 28px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .brand-icon svg {
+            width: 22px;
+            height: 22px;
+            fill: none;
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        .brand h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: -0.3px;
+        }
+
+        .btn-logout {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 8px 18px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-logout:hover {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+        }
+
+        /* Layout Grid */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            flex: 1;
+        }
+
+        @media (max-width: 900px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Glass Cards */
+        .glass-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .live-tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .pulse-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse-dot-anim 1.5s infinite;
+        }
+
+        @keyframes pulse-dot-anim {
+            0% { transform: scale(0.9); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.5; }
+            100% { transform: scale(0.9); opacity: 1; }
+        }
+
+        /* Status Display */
         #status {
             font-size: 18px;
-            margin-top: 20px;
+            font-weight: 600;
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 12px;
+            padding: 16px 20px;
+            transition: all 0.3s ease;
         }
-        #otpBox {
+
+        /* Risk Gauge Progress Bar */
+        .risk-gauge-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .risk-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #10b981, #3b82f6);
+            border-radius: 8px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.6s ease;
+        }
+
+        /* Modal Overlay Backdrop for Locked States */
+        #modalBackdrop {
             display: none;
-            margin-top: 20px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(9, 13, 22, 0.88);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
         }
-        input {
-            padding: 6px;
-            font-size: 16px;
+
+        .modal-content-card {
+            background: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 32px;
+            max-width: 520px;
+            width: 100%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
         }
-        button {
-            padding: 6px 12px;
+
+        .form-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            margin-top: 10px;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        select, input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            color: #ffffff;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        select option {
+            background: #0f172a;
+            color: #ffffff;
+        }
+
+        select:focus, input:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+        }
+
+        .action-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .btn-submit-reason {
+            flex: 1;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: #ffffff;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-submit-reason:hover {
+            background: linear-gradient(135deg, #4338ca, #6d28d9);
+        }
+
+        .btn-warning-logout {
+            padding: 12px 18px;
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-warning-logout:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-otp {
+            padding: 12px 20px;
+            background: #f59e0b;
+            color: #000;
+            font-weight: 700;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-otp:hover {
+            background: #d97706;
+        }
+
+        /* Telemetry Visualizer Canvas */
+        .canvas-wrapper {
+            width: 100%;
+            height: 240px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Metrics grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 10px 8px;
+            text-align: center;
+        }
+
+        .stat-value {
             font-size: 16px;
-            margin-left: 10px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: #64748b;
+            margin-top: 2px;
+            text-transform: uppercase;
         }
     </style>
 </head>
 
 <body>
-    <h2>Continuous Behavioral Authentication</h2>
-    <button onclick="logout()" style="float:right;">Logout</button>
+    <!-- Persistent Modal Backdrop for Locked States -->
+    <div id="modalBackdrop">
+        <div class="modal-content-card" id="modalCardContainer">
+            <!-- Dynamic Modal Content rendered via JS -->
+        </div>
+    </div>
 
-    <p>Move your mouse naturally. System is monitoring in real time.</p>
+    <!-- Topbar Navigation -->
+    <div class="topbar">
+        <div class="brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </div>
+            <h2>Continuous Behavioral Authentication</h2>
+        </div>
+        <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
 
-    <div id="status">Status: Monitoring...</div>
+    <!-- Main Grid -->
+    <div class="grid-container">
+        <!-- Left Panel: Live Security Monitor -->
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title">Live Risk Engine</span>
+                <span class="live-tag"><span class="pulse-dot"></span> Active Monitoring</span>
+            </div>
 
-    <div id="otpBox">
-        <p>Suspicious activity detected. Enter OTP:</p>
-        <input type="text" id="otpInput" />
-        <button onclick="submitOTP()">Verify OTP</button>
+            <p style="color: #94a3b8; font-size: 14px;">
+                Move your cursor across the window. Behavioral dynamics are evaluated in 10-second intervals.
+            </p>
+
+            <div id="status">Status: Monitoring (Analyzing 10s Window)...</div>
+
+            <!-- Risk Gauge -->
+            <div class="risk-gauge-container">
+                <div class="risk-label-row">
+                    <span>Low Risk (&lt;60%)</span>
+                    <span>OTP Required (60-90%)</span>
+                    <span>Warning (&gt;90%)</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value" id="confidenceValue">100%</div>
+                    <div class="stat-label">Confidence</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="capturedCount">0</div>
+                    <div class="stat-label">Points/10s</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">10.0s</div>
+                    <div class="stat-label">Eval Interval</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">IsoForest</div>
+                    <div class="stat-label">ML Model</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Telemetry Canvas Visualizer -->
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title">Mouse Telemetry Visualizer</span>
+                <span class="live-tag" style="color: #a855f7; background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.2);">
+                    Live Motion Path
+                </span>
+            </div>
+
+            <div class="canvas-wrapper">
+                <canvas id="trailCanvas"></canvas>
+            </div>
+
+            <p style="font-size: 13px; color: #64748b;">
+                Glowing spatial mouse movement vectors processed for real-time anomaly detection.
+            </p>
+        </div>
     </div>
 
     <script src="/static/mouse.js"></script>

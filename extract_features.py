@@ -1,21 +1,60 @@
+import os
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+import joblib
 
-def extract(file_path):
-    df = pd.read_csv(file_path, names=["t", "x", "y"])
+SCALER_PATH = "model/scaler.pkl"
 
+def extract_raw(df):
+    df = df.copy()
     df["dx"] = df["x"].diff()
     df["dy"] = df["y"].diff()
-    df["dt"] = df["t"].diff() / 1000  # ms → seconds
+    df["dt"] = df["t"].diff() / 1000.0  # ms -> seconds
+
+    # Prevent division by zero
+    df["dt"] = df["dt"].replace(0, 0.001)
 
     df["speed"] = np.sqrt(df["dx"]**2 + df["dy"]**2) / df["dt"]
     df["acc"] = df["speed"].diff() / df["dt"]
+    df["jerk"] = df["acc"].diff() / df["dt"]
 
-    df = df.replace([np.inf, -np.inf], 0).fillna(0)
+    features = df[["speed", "acc", "jerk"]].replace([np.inf, -np.inf], 0).fillna(0)
+    return features
 
-    # 🔥 SCALE FEATURES (CRITICAL)
-    scaler = StandardScaler()
-    scaled = scaler.fit_transform(df[["speed", "acc"]])
+def extract(file_path, scaler=None, fit=False):
+    if isinstance(file_path, str):
+        if not os.path.exists(file_path):
+            return pd.DataFrame()
+        df = pd.read_csv(file_path, names=["t", "x", "y"])
+    elif isinstance(file_path, pd.DataFrame):
+        df = file_path
+    else:
+        return pd.DataFrame()
 
-    return pd.DataFrame(scaled, columns=["speed", "acc"])
+    if len(df) < 3:
+        return pd.DataFrame()
+
+    features = extract_raw(df)
+
+    if scaler is not None:
+        scaled = scaler.transform(features)
+        return pd.DataFrame(scaled, columns=features.columns)
+
+    if fit:
+        new_scaler = StandardScaler()
+        scaled = new_scaler.fit_transform(features)
+        return pd.DataFrame(scaled, columns=features.columns), new_scaler
+
+    if os.path.exists(SCALER_PATH):
+        try:
+            loaded_scaler = joblib.load(SCALER_PATH)
+            scaled = loaded_scaler.transform(features)
+            return pd.DataFrame(scaled, columns=features.columns)
+        except Exception as e:
+            print("Warning: could not load scaler:", e)
+
+    # Fallback if no pre-fitted scaler is present
+    fallback_scaler = StandardScaler()
+    scaled = fallback_scaler.fit_transform(features)
+    return pd.DataFrame(scaled, columns=features.columns)
