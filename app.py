@@ -150,8 +150,11 @@ def collect():
                 session["otp_verified"] = False
                 session["otp_attempts"] = 0
 
-                # Task 2: Log only that an OTP was generated; NEVER write or log raw OTP value to disk
+                # Log OTP event (In local dev mode, output OTP to terminal for testing)
                 logger.info("Generated new cryptographically secure OTP for session (Expiry: %ds)", OTP_EXPIRY_SECONDS)
+                if app.debug:
+                    logger.info("🔐 [DEV ONLY LOG] Generated OTP for testing: %s", new_otp)
+
         else:
             status = "AUTHENTICATED"
 
