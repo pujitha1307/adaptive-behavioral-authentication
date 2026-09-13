@@ -21,9 +21,9 @@ Instead of relying solely on static credentials, this system applies **unsupervi
   - Smooth real-time risk progress bar with dynamic color transitions (Green \(\rightarrow\) Amber \(\rightarrow\) Red).
 
 - 🔐 **Debounced & Adaptive Multi-Tiered Step-Up Security**
-  - **Low Risk (<60% / Confidence >40%)**: Background monitoring with zero user disruption.
-  - **Medium Risk (60% – 90% / Confidence 10%–40%)**: **Debounced OTP Verification** (requires 3 consecutive medium-risk evaluation windows before locking to prevent false positives; 5-attempt max lockout).
-  - **High Risk (≥90% / Confidence <10%)**: **Immediate Sticky Screen Lock** requiring **Specified Reason Dropdown** selection + **Password Re-authentication** (`user_01` / `password123`).
+  - **Low Risk (< Medium Threshold)**: Background monitoring with zero user disruption.
+  - **Medium Risk (Medium – High Threshold)**: **Debounced OTP Verification** (requires 3 consecutive medium-risk evaluation windows before locking to prevent false positives; 5-attempt max lockout).
+  - **High Risk (≥ High Threshold)**: **Immediate Sticky Screen Lock** requiring **Specified Reason Dropdown** selection + **Password Re-authentication** (`user_01` / `password123`).
 
 - 🧪 **Automated Testing & CI/CD Pipeline**
   - Integrated `pytest` suite testing feature extraction, false-positive debounce counters, OTP lifecycle, max-attempt lockout, and input validation.
@@ -37,17 +37,17 @@ Instead of relying solely on static credentials, this system applies **unsupervi
 
 ## 📊 Data-Derived Risk Thresholds & Model Evaluation
 
-Risk score boundaries and sigmoidal mapping parameters are data-derived directly from the training set score distribution in `train_model.py`. After fitting the `IsolationForest` model on baseline telemetry, `model.decision_function()` is evaluated across the training samples to compute baseline score percentiles, which are saved to `model/thresholds.json`. In `train_model.py`, 20% of the baseline telemetry sequence is held out as an unseen validation set to compute the **False Positive Rate (FPR)**, saved alongside training sample sizes to `model/metrics.json` and logged during build pipelines. `authenticate.py` dynamically loads these data-derived parameters in memory rather than relying on arbitrary hardcoded guesses.
+Risk score boundaries and sigmoidal mapping parameters are data-derived directly from the training set score distribution in `train_model.py`. After fitting the `IsolationForest` model on baseline telemetry, `model.decision_function()` is evaluated across the training samples to compute the baseline mean decision score (`s_mean`), which is set as the sigmoid midpoint (`s_mid`). The medium and high risk decision boundaries are computed by evaluating the 15th percentile (`s_p15`) and 2nd percentile (`s_p02`) of the user's baseline score distribution through the fitted sigmoid equation: `medium_risk_threshold = 100 - sigmoid(s_p15)` and `high_risk_threshold = 100 - sigmoid(s_p02)`. These values are saved to `model/thresholds.json`. In `train_model.py`, 20% of the baseline telemetry sequence is held out as an unseen validation set to compute the **False Positive Rate (FPR)**, saved alongside training sample sizes to `model/metrics.json` and logged during build pipelines. `authenticate.py` dynamically loads these data-derived parameters in memory rather than relying on hardcoded guesses.
 
 ---
 
 ## 🔐 Risk Thresholds & Action Matrix
 
-| Risk Score | Confidence Score | System Status | Security Action & Debounce Requirement |
-|---|---|---|---|
-| **`< 60%`** | **`> 40%`** | `AUTHENTICATED` | **Normal Session**: Uninterrupted background monitoring. Resets debounce counter to 0. |
-| **`60% – 90%`** | **`10% – 40%`** | `OTP_REQUIRED` | **Debounced Step-Up OTP**: Requires **3 consecutive medium-risk windows** to trigger sticky 6-digit OTP prompt. 5 max failed attempts lockout. |
-| **`≥ 90%`** | **`< 10%`** | `HIGH_RISK_WARNING` | **Immediate Lockout**: Bypasses debounce. Must select specified reason from dropdown & re-enter credentials (`user_01` / `password123`). |
+| Risk Score | System Status | Security Action & Debounce Requirement |
+|---|---|---|
+| **`< Medium Threshold`** | `AUTHENTICATED` | **Normal Session**: Uninterrupted background monitoring. Resets debounce counter to 0. |
+| **`Medium – High Threshold`** | `OTP_REQUIRED` | **Debounced Step-Up OTP**: Requires **3 consecutive medium-risk windows** to trigger sticky 6-digit OTP prompt. 5 max failed attempts lockout. |
+| **`≥ High Threshold`** | `HIGH_RISK_WARNING` | **Immediate Lockout**: Bypasses debounce. Must select specified reason from dropdown & re-enter credentials (`user_01` / `password123`). |
 
 ---
 
@@ -138,7 +138,7 @@ Open browser: 👉 **`http://127.0.0.1:8000`**
 
 ## 🔑 Default Test Credentials
 
-When testing **High Risk (≥90%) Re-authentication**:
+When testing **High Risk Re-authentication**:
 - **Username:** `user_01`
 - **Password:** `password123`
 

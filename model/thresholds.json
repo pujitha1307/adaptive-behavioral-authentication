@@ -1,7 +1,7 @@
 {
-  "medium_risk_threshold": 60.0,
-  "high_risk_threshold": 90.0,
-  "s_mid": 0.04,
+  "medium_risk_threshold": 77.58,
+  "high_risk_threshold": 99.33,
+  "s_mid": 0.1467,
   "k": 22.0,
   "baseline_score_mean": 0.1467,
   "baseline_score_p15": 0.0903,
