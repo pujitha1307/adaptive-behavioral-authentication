@@ -43,7 +43,17 @@ def login():
 
 @app.route("/start-session", methods=["POST"])
 def start_session():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+
+    # Validate initial login credentials if submitted via form
+    if username or password:
+        if username != USER or not check_password_hash(USER_PASSWORD_HASH, password):
+            logger.warning("Initial login failed for username: %s", username)
+            return render_template("login.html", error="Invalid username or password.")
+
     # Initialize / Reset Flask session-scoped variables
+    session["user"] = USER
     session["session_state"] = "NORMAL"
     session["suspicious_count"] = 0
     session["otp_code"] = None
@@ -52,6 +62,7 @@ def start_session():
     session["otp_attempts"] = 0
     logger.info("New behavioral authentication session started for user %s", USER)
     return render_template("dashboard.html")
+
 
 @app.route("/collect", methods=["POST"])
 def collect():

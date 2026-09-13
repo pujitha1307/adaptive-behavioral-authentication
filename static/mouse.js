@@ -137,7 +137,8 @@ setInterval(() => {
                         <label class="form-label" style="color: #6366f1;">Re-enter Account Credentials:</label>
                         <div style="display: flex; gap: 10px; margin-bottom: 12px;">
                             <input type="text" id="modalReAuthUser" value="user_01" placeholder="Username" style="flex:1;" />
-                            <input type="password" id="modalReAuthPass" placeholder="Password (password123)" style="flex:1;" />
+                            <input type="password" id="modalReAuthPass" placeholder="Enter Password" style="flex:1;" />
+
                         </div>
                     </div>
 
